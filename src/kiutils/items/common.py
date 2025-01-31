@@ -18,7 +18,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict
+from typing import Literal, Optional, List, Dict
 
 from kiutils.utils.strings import dequote
 
@@ -330,6 +330,8 @@ class Font():
                 if item == 'bold': object.bold = True
                 if item == 'italic': object.italic = True
                 continue
+            object.bold = item[0] == 'bold' and item[1] == 'yes'
+            object.italic = item[0] == 'italic' and item[1] == 'yes'
             if item[0] == 'face': object.face = item[1]
             if item[0] == 'size':
                 object.height = item[1]
@@ -355,8 +357,8 @@ class Font():
 
         if self.face is not None:        face_name = f'(face "{dequote(self.face)}") '
         if self.thickness is not None:   thickness = f' (thickness {self.thickness})'
-        if self.bold == True:            bold = ' bold'
-        if self.italic == True:          italic = ' italic'
+        if self.bold == True:            bold = ' (bold yes)'
+        if self.italic == True:          italic = ' (italic yes)'
         if self.lineSpacing is not None: linespacing = f' (line_spacing {self.lineSpacing})'
         if self.color is not None:       color = f' {self.color.to_sexpr()}'
 
@@ -482,6 +484,7 @@ class Effects():
             if type(item) != type([]):
                 if item == 'hide': object.hide = True
                 else: continue
+            object.hide = item[0] == 'hide' and item[1] == 'yes'
             if item[0] == 'font': object.font = Font().from_sexpr(item)
             if item[0] == 'justify': object.justify = Justify().from_sexpr(item)
             if item[0] == 'href': object.href = item[1]
@@ -501,7 +504,7 @@ class Effects():
         endline = '\n' if newline else ''
 
         justify = f' {self.justify.to_sexpr()}' if self.justify.to_sexpr() != '' else ''
-        hide = f' hide' if self.hide else ''
+        hide = f' (hide yes)' if self.hide else ''
         href = f' (href "{dequote(self.href)}")' if self.href is not None else ''
 
         expression =  f'{indents}(effects {self.font.to_sexpr()}{justify}{href}{hide}){endline}'
@@ -826,9 +829,11 @@ class Property():
 
     showName: bool = False
     """The ``show_name`` token defines if the property name is visibly shown. Used for netclass
-    labels.
-
-    Available since KiCad v7"""
+    labels."""
+    
+    autoplace: bool = True
+    """The ``do_not_autoplace`` token defines if the property is automatically moved to an optimal
+    place by the KiCad schematic editor"""
 
     @classmethod
     def from_sexpr(cls, exp: list) -> Property:
@@ -858,6 +863,7 @@ class Property():
             if item[0] == 'at': object.position = Position().from_sexpr(item)
             if item[0] == 'effects': object.effects = Effects().from_sexpr(item)
             if item[0] == 'show_name': object.showName = True
+            if item[0] == 'do_not_autoplace' : object.autoplace = False
         return object
 
     def to_sexpr(self, indent: int = 4, newline: bool = True) -> str:
@@ -876,8 +882,9 @@ class Property():
         posA = f' {self.position.angle}' if self.position.angle is not None else ''
         id = f' (id {self.id})' if self.id is not None else ''
         sn = ' (show_name)' if self.showName else ''
+        ap = ' (do_not_autoplace)' if not self.autoplace else ''
 
-        expression =  f'{indents}(property "{dequote(self.key)}" "{dequote(self.value)}"{id} (at {self.position.X} {self.position.Y}{posA}){sn}'
+        expression =  f'{indents}(property "{dequote(self.key)}" "{dequote(self.value)}"{id} (at {self.position.X} {self.position.Y}{posA}){ap}{sn}'
         if self.effects is not None:
             expression += f'\n{self.effects.to_sexpr(indent+2)}'
             expression += f'{indents}){endline}'
