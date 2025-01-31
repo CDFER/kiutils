@@ -325,6 +325,10 @@ class Symbol():
     pinNamesOffset: Optional[float] = None
     """The optional ``pinNamesOffset`` token defines the pin name offset for all pin names of the
     symbol. If not defined, the pin name offset is 0.508mm (0.020")"""
+    
+    excludeFromSim: Optional[bool] = None
+    """The optional ``excludeFromSim`` token, defines if a symbol is to be include in the simulation
+    output. If undefined, the token will not be generated in `self.to_sexpr()`."""
 
     inBom: Optional[bool] = None
     """The optional ``inBom`` token, defines if a symbol is to be include in the bill of material
@@ -389,6 +393,7 @@ class Symbol():
                         if property[0] == 'offset': object.pinNamesOffset = property[1]
                     else:
                         if property == 'hide': object.pinNamesHide = True
+            if item[0] == 'exclude_from_sim': object.excludeFromSim = True if item[1] == 'yes' else False
             if item[0] == 'in_bom': object.inBom = True if item[1] == 'yes' else False
             if item[0] == 'on_board': object.onBoard = True if item[1] == 'yes' else False
             if item[0] == 'power': object.isPower = True
@@ -454,6 +459,9 @@ class Symbol():
         endline = '\n' if newline else ''
         obtext, ibtext = '', ''
 
+        if self.excludeFromSim is not None:
+            estext = 'yes' if self.excludeFromSim else 'no'
+        excludefromsim = f' (exclude_from_sim {estext})' if self.excludeFromSim is not None else ''
         if self.inBom is not None:
             ibtext = 'yes' if self.inBom else 'no'
         inbom = f' (in_bom {ibtext})' if self.inBom is not None else ''
@@ -467,7 +475,7 @@ class Symbol():
         pinnumbers = f' (pin_numbers hide)' if self.hidePinNumbers else ''
         extends = f' (extends "{dequote(self.extends)}")' if self.extends is not None else ''
 
-        expression =  f'{indents}(symbol "{dequote(self.libId)}"{extends}{power}{pinnumbers}{pinnames}{inbom}{onboard}\n'
+        expression =  f'{indents}(symbol "{dequote(self.libId)}"{extends}{power}{pinnumbers}{pinnames}{excludefromsim}{inbom}{onboard}\n'
         for item in self.properties:
             expression += item.to_sexpr(indent+2)
         for item in self.graphicItems:
@@ -492,6 +500,9 @@ class SymbolLib():
 
     generator: Optional[str] = None
     """The ``generator`` token attribute defines the program used to write the file"""
+    
+    generatorVersion: Optional[str] = None
+    """The ``generator`` token attribute defines the program version used to write the file"""
 
     symbols: List[Symbol] = field(default_factory=list)
     """The ``symbols`` token defines a list of zero or more symbols that are part of the symbol library"""
@@ -549,6 +560,7 @@ class SymbolLib():
         for item in exp[1:]:
             if item[0] == 'version': object.version = item[1]
             if item[0] == 'generator': object.generator = item[1]
+            if item[0] == 'generator_version': object.generatorVersion = item[1]
             if item[0] == 'symbol': object.symbols.append(Symbol().from_sexpr(item))
         return object
 
@@ -585,7 +597,7 @@ class SymbolLib():
         indents = ' '*indent
         endline = '\n' if newline else ''
 
-        expression =  f'{indents}(kicad_symbol_lib (version {self.version}) (generator {self.generator})\n'
+        expression =  f'{indents}(kicad_symbol_lib (version {self.version}) (generator "{self.generator}") (generator_version "{self.generatorVersion}")\n'
         for item in self.symbols:
             expression += f'{indents}{item.to_sexpr(indent+2)}'
         expression += f'{indents}){endline}'
